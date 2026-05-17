@@ -90,8 +90,3 @@ Sem `uv`:
 ```bash
 python main.py
 ```
-
----
-
-```
-```
