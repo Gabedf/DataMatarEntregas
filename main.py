@@ -5,7 +5,7 @@ from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
 import os
 
-# %% VARIÁVEIS DE AMBIENTE
+## %% VARIÁVEIS DE AMBIENTE
 load_dotenv()
 
 source_url = (
@@ -21,12 +21,12 @@ engine = create_engine(source_url)
 with engine.connect() as conn:
     print("Conectado!")
 
-# %% TABELAS EXISTENTES (utilizado para possíveis análises)
+## %% TABELAS EXISTENTES (utilizado para possíveis análises)
 tabelas = ["centrosdistribuicao", "cidades", "clientes", "encomendas", "entregas", "estados", 
  "motoristas", "movimentacoes_encomenda", "rotas", "situacoeentregas", "situacoesmovimentacao", 
  "tiposervico", "tiposveiculos", "veiculos", "viagens", "viagens_encomendas"]
 
-# %% QUERYS
+## %% QUERYS
 query_cidade    = f"""
                     SELECT
                     *
@@ -69,7 +69,7 @@ query_status    = f"""
                     FROM situacoeentregas
                     """
 
-# %% CONSULTA MYSQL
+## %% CONSULTA MYSQL
 cidade = pl.read_database(
     query=query_cidade,
     connection=engine
@@ -107,7 +107,7 @@ situacao = pl.read_database(
 
 data = pl.read_excel('data/raw/Ch3-SampleDateDim.xls', sheet_name='LoadDates')
 
-# %% TRATAMENTOS E CONSOLUIDAÇÃO TABELAS DIMENSÃO
+## %% TRATAMENTOS E CONSOLUIDAÇÃO TABELAS DIMENSÃO
 # CONSOLIDAÇÃO DIMENSÃO ENCOMENDA
 dim_encomenda = (
     encomenda.join(
@@ -171,7 +171,7 @@ dim_data  = (data
 # LISTA COM TABELAS DIMENSÃO EXISTENTES
 dimensoes = [dim_encomenda, dim_cliente, dim_data]
 
-# %% - TRATAMENTOS E CONSOLIDAÇÃO TABELA FATO
+## %% - TRATAMENTOS E CONSOLIDAÇÃO TABELA FATO
 entrega = entrega.with_columns([(pl.col("data_entrega") - pl.col("data_saida_entrega")).dt.total_minutes().cast(pl.Int64).alias('tempoEntrega'),
                                 pl.col("data_entrega").dt.strftime("%Y%m%d").cast(pl.Int64).alias('idDimDataEntrega')])
 
@@ -194,7 +194,7 @@ fatoEntregaAux = (
         )
                )
 
-# %%
+## %%
 # Colunas essenciais para tabela fato
 fatoEntrega     = (fatoEntregaAux
                    .rename({'desc_situacao': 'situacaoEntrega'})
@@ -202,13 +202,13 @@ fatoEntrega     = (fatoEntregaAux
 dim_encomenda   = dim_encomenda.drop(['id_cliente', 'id_encomenda'])
 dim_cliente     = dim_cliente.drop('id_cliente')
 
-# %%
+## %%
 show(dim_encomenda)
 show(dim_cliente)
 show(dim_data)
 show(fatoEntrega)
 
-# %% SUBIR BANCO
+## %% SUBIR BANCO
 server_url = (
     f"mysql+pymysql://{os.getenv('DB_USER')}:"
     f"{os.getenv('DB_PASSWORD')}@"
@@ -234,29 +234,35 @@ dw_url = (
 )
 
 engine_dw = create_engine(dw_url)
-
-# %%
+with engine_dw.connect() as conn:
+    conn.execute(text("DROP TABLE IF EXISTS fatoEntrega"))
+    conn.execute(text("DROP TABLE IF EXISTS dim_cliente"))
+    conn.execute(text("DROP TABLE IF EXISTS dim_encomenda"))
+    conn.execute(text("DROP TABLE IF EXISTS dim_data"))
+    conn.commit()
+    
+## %%
 dim_cliente.to_pandas().to_sql(
     name='dim_cliente',
     con=engine_dw,
-    if_exists='replace',
+    if_exists='fail',
     index=False
 )
 dim_encomenda.to_pandas().to_sql(
     name='dim_encomenda',
     con=engine_dw,
-    if_exists='replace',
+    if_exists='fail',
     index=False
 )
 dim_data.to_pandas().to_sql(
     name='dim_data',
     con=engine_dw,
-    if_exists='replace',
+    if_exists='fail',
     index=False
 )
 fatoEntrega.to_pandas().to_sql(
     name='fatoEntrega',
     con=engine_dw,
-    if_exists='replace',
+    if_exists='fail',
     index=False
 )
